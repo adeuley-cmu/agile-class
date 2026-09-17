@@ -1,0 +1,111 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    background: #f5f7f8;
+    color: #172121;
+}
+
+.page {
+    padding: 20px;
+}
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.panel,
+.card,
+.empty,
+.validation {
+    background: #fff;
+    border: 1px solid #d5dedc;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+input,
+select,
+textarea {
+    border: 1px solid #cbd6d3;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 14px;
+}
+
+textarea {
+    min-height: 90px;
+}
+
+.inline-row {
+    display: flex;
+    gap: 8px;
+}
+
+.address-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.address-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    background: #f5f7f8;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 6px;
+}
+
+.card-header,
+.actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.category {
+    color: #176b5b;
+    font-weight: 600;
+}
+
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #176b5b;
+    color: #fff;
+}
+
+.btn-danger {
+    background: #fde8e7;
+    color: #a62925;
+}
+
+.validation {
+    background: #fff6f6;
+    border-color: #f0b9b8;
+    color: #7e1e1a;
+}
