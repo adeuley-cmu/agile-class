@@ -1,286 +1,79 @@
 @page "/"
 @using AgileClass.Models
+@using AgileClass.Services
+@implements IDisposable
 @inject IJSRuntime JS
+@inject ICommunityResourceStore ResourceStore
+@inject ILocalAccountService AccountService
 
 <PageTitle>Resources</PageTitle>
 
-<div class="page">
+<section class="page">
     <header class="header-row">
-        <div>
-            <h1>Community resources</h1>
-            <p>Find services and support in your community.</p>
-        </div>
-        <button class="btn btn-primary" @onclick="ShowAddPanel">Add resource</button>
+        <div><h1>Community resources</h1><p>Find services and support in your community.</p></div>
+        @if (AccountService.IsSignedIn) { <button class="btn btn-primary" @onclick="ShowAddPanel">Add resource</button> }
+        else { <NavLink class="btn btn-primary" href="/login?returnUrl=%2F">Sign in to add a resource</NavLink> }
     </header>
-
-    @if (showValidation)
-    {
-        <div class="validation">Name, category, and at least one address are required.</div>
-    }
-
+    @if (showValidation) { <div class="validation">Name, category, and at least one address are required.</div> }
     @if (isFormVisible)
     {
-        <section class="panel">
-            <h2>@formTitle</h2>
-
-            <div class="form-grid">
-                <label>
-                    Resource name *
-                    <input @bind="name" maxlength="120" />
-                </label>
-
-                <label>
-                    Category *
-                    <select @bind="category">
-                        <option value="">Select a category</option>
-                        @foreach (var item in Categories)
-                        {
-                            <option value="@item">@item</option>
-                        }
-                    </select>
-                </label>
-
-                <label>
-                    Address
-                    <div class="inline-row">
-                        <input @bind="address" maxlength="200" placeholder="Enter a full address" />
-                        <button class="btn" @onclick="AddLocation">Add</button>
-                    </div>
-                </label>
-
-                @if (draftLocations.Count > 0)
-                {
-                    <ul class="address-list">
-                        @foreach (var location in draftLocations)
-                        {
-                            <li>
-                                <span>@location.FullAddress</span>
-                                <button class="btn btn-danger" @onclick="() => RemoveLocation(location)">Remove</button>
-                            </li>
-                        }
-                    </ul>
-                }
-
-                <label>
-                    Description
-                    <textarea @bind="description" maxlength="500"></textarea>
-                </label>
-
-                <label>
-                    Phone number
-                    <input @bind="phone" maxlength="30" />
-                </label>
-
-                <label>
-                    Website
-                    <input @bind="website" maxlength="250" />
-                </label>
-            </div>
-
-            <div class="actions">
-                <button class="btn" @onclick="Cancel">Cancel</button>
-                <button class="btn btn-primary" @onclick="Save">@saveButtonText</button>
-            </div>
-        </section>
+        <section class="panel"><h2>@formTitle</h2><div class="form-grid">
+            <label>Resource name *<input @bind="name" maxlength="120" /></label>
+            <label>Category *<select @bind="category"><option value="">Select a category</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
+            <label>Address<div class="inline-row"><input @bind="address" maxlength="200" placeholder="Enter a full address" /><button class="btn" @onclick="AddLocation">Add</button></div></label>
+            @if (draftLocations.Count > 0) { <ul class="address-list">@foreach (var location in draftLocations) { <li><span>@location.FullAddress</span><button class="btn btn-danger" @onclick="() => RemoveLocation(location)">Remove</button></li>}</ul> }
+            <label>Description<textarea @bind="description" maxlength="500"></textarea></label>
+            <label>Phone number<input @bind="phone" maxlength="30" /></label>
+            <label>Website<input @bind="website" maxlength="250" /></label>
+        </div><div class="actions"><button class="btn" @onclick="Cancel">Cancel</button><button class="btn btn-primary" @onclick="Save">@saveButtonText</button></div></section>
     }
-
-    @if (resources.Count == 0)
-    {
-        <section class="empty">
-            <h2>No resources yet</h2>
-            <p>Add the first community resource to get started.</p>
-        </section>
-    }
+    @if (resources.Count == 0) { <section class="empty"><h2>No resources yet</h2><p>Add the first community resource to get started.</p></section> }
     else
     {
-        <section class="cards">
-            @foreach (var resource in resources)
-            {
-                <article class="card">
-                    <div class="card-header">
-                        <h3>@resource.Name</h3>
-                        <div class="actions">
-                            <button class="btn" @onclick="() => EditResource(resource)">Edit</button>
-                            <button class="btn btn-danger" @onclick="() => DeleteResource(resource)">Delete</button>
-                        </div>
-                    </div>
-
-                    <p class="category">@resource.Category</p>
-
-                    @foreach (var location in resource.Locations)
-                    {
-                        <p>Address: @location.FullAddress</p>
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(resource.Description))
-                    {
-                        <p>@resource.Description</p>
-                    }
-                </article>
-            }
-        </section>
+        <section class="cards">@foreach (var resource in resources)
+        {
+            <article class="card"><div class="card-header"><h3>@resource.Name</h3>@if (AccountService.IsSignedIn) { <div class="actions"><button class="btn" @onclick="() => EditResource(resource)">Edit</button><button class="btn btn-danger" @onclick="() => DeleteResource(resource)">Delete</button></div> }</div>
+            <p class="category">@resource.Category</p>@foreach (var location in resource.Locations) { <p>Address: @location.FullAddress</p> }@if (!string.IsNullOrWhiteSpace(resource.Description)) { <p>@resource.Description</p> }</article>
+        }</section>
     }
-</div>
+</section>
 
 @code {
-    private static readonly string[] Categories =
-    [
-        "Food",
-        "Shelter",
-        "Healthcare",
-        "Clothing",
-        "Employment",
-        "Transportation",
-        "Legal Assistance",
-        "Other"
-    ];
-
+    private static readonly string[] Categories = ["Food", "Shelter", "Healthcare", "Clothing", "Employment", "Transportation", "Legal Assistance", "Other"];
     private readonly List<CommunityResource> resources = [];
     private readonly List<ResourceLocation> draftLocations = [];
-
     private CommunityResource? resourceBeingEdited;
-    private bool isFormVisible;
-    private bool showValidation;
-
-    private string name = string.Empty;
-    private string category = string.Empty;
-    private string address = string.Empty;
-    private string description = string.Empty;
-    private string phone = string.Empty;
-    private string website = string.Empty;
-
+    private bool isFormVisible, showValidation;
+    private string name = string.Empty, category = string.Empty, address = string.Empty, description = string.Empty, phone = string.Empty, website = string.Empty;
     private string formTitle => resourceBeingEdited is null ? "Add a resource" : "Update resource";
     private string saveButtonText => resourceBeingEdited is null ? "Save resource" : "Update resource";
 
-    private void ShowAddPanel()
+    protected override async Task OnInitializedAsync()
     {
-        ResetForm();
-        isFormVisible = true;
+        AccountService.AuthenticationStateChanged += Refresh;
+        await AccountService.EnsureInitializedAsync();
+        resources.AddRange(await ResourceStore.GetAllAsync());
     }
-
-    private void Cancel()
-    {
-        ResetForm();
-        isFormVisible = false;
-    }
+    public void Dispose() => AccountService.AuthenticationStateChanged -= Refresh;
+    private void Refresh() => InvokeAsync(StateHasChanged);
+    private void ShowAddPanel() { if (!AccountService.IsSignedIn) return; ResetForm(); isFormVisible = true; }
+    private void Cancel() { ResetForm(); isFormVisible = false; }
 
     private async Task Save()
     {
         AddPendingAddress();
-
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || draftLocations.Count == 0)
-        {
-            showValidation = true;
-            await JS.InvokeVoidAsync("alert", "Name, category, and at least one address are required.");
-            return;
-        }
-
-        showValidation = false;
-
-        var updated = new CommunityResource
-        {
-            Id = resourceBeingEdited?.Id ?? Guid.NewGuid(),
-            Name = name.Trim(),
-            Category = category,
-            Locations = draftLocations.ToArray(),
-            Description = description.Trim(),
-            Phone = phone.Trim(),
-            Website = website.Trim(),
-            IsVerified = false,
-            CreatedAt = resourceBeingEdited?.CreatedAt ?? DateTimeOffset.UtcNow
-        };
-
-        if (resourceBeingEdited is null)
-        {
-            resources.Add(updated);
-        }
-        else
-        {
-            var index = resources.FindIndex(r => r.Id == resourceBeingEdited.Id);
-            if (index >= 0)
-            {
-                resources[index] = updated;
-            }
-        }
-
-        ResetForm();
-        isFormVisible = false;
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || draftLocations.Count == 0) { showValidation = true; await JS.InvokeVoidAsync("alert", "Name, category, and at least one address are required."); return; }
+        var updated = new CommunityResource { Id = resourceBeingEdited?.Id ?? Guid.NewGuid(), Name = name.Trim(), Category = category, Locations = draftLocations.ToArray(), Description = description.Trim(), Phone = phone.Trim(), Website = website.Trim(), CreatedAt = resourceBeingEdited?.CreatedAt ?? DateTimeOffset.UtcNow };
+        await ResourceStore.SaveAsync(updated);
+        var index = resources.FindIndex(item => item.Id == updated.Id);
+        if (index < 0) resources.Add(updated); else resources[index] = updated;
+        ResetForm(); isFormVisible = false;
     }
 
-    private void EditResource(CommunityResource resource)
-    {
-        resourceBeingEdited = resource;
-        isFormVisible = true;
-        showValidation = false;
-
-        name = resource.Name;
-        category = resource.Category;
-        description = resource.Description;
-        phone = resource.Phone;
-        website = resource.Website;
-        address = string.Empty;
-
-        draftLocations.Clear();
-        draftLocations.AddRange(resource.Locations);
-    }
-
-    private async Task DeleteResource(CommunityResource resource)
-    {
-        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Remove {resource.Name} from the resource list?");
-        if (!confirmed)
-        {
-            return;
-        }
-
-        resources.RemoveAll(item => item.Id == resource.Id);
-
-        if (resourceBeingEdited?.Id == resource.Id)
-        {
-            ResetForm();
-            isFormVisible = false;
-        }
-    }
-
-    private void AddLocation()
-    {
-        _ = AddPendingAddress();
-    }
-
-    private void RemoveLocation(ResourceLocation location)
-    {
-        draftLocations.Remove(location);
-    }
-
-    private bool AddPendingAddress()
-    {
-        var trimmedAddress = address.Trim();
-        if (string.IsNullOrWhiteSpace(trimmedAddress))
-        {
-            return false;
-        }
-
-        var isDuplicate = draftLocations.Any(location =>
-            string.Equals(location.FullAddress, trimmedAddress, StringComparison.OrdinalIgnoreCase));
-
-        if (!isDuplicate)
-        {
-            draftLocations.Add(new ResourceLocation { FullAddress = trimmedAddress });
-        }
-
-        address = string.Empty;
-        return true;
-    }
-
-    private void ResetForm()
-    {
-        resourceBeingEdited = null;
-        showValidation = false;
-        name = string.Empty;
-        category = string.Empty;
-        address = string.Empty;
-        description = string.Empty;
-        phone = string.Empty;
-        website = string.Empty;
-        draftLocations.Clear();
-    }
+    private void EditResource(CommunityResource resource) { if (!AccountService.IsSignedIn) return; resourceBeingEdited = resource; isFormVisible = true; showValidation = false; name = resource.Name; category = resource.Category; description = resource.Description; phone = resource.Phone; website = resource.Website; address = string.Empty; draftLocations.Clear(); draftLocations.AddRange(resource.Locations); }
+    private async Task DeleteResource(CommunityResource resource) { if (!AccountService.IsSignedIn || !await JS.InvokeAsync<bool>("confirm", $"Remove {resource.Name} from the resource list?")) return; await ResourceStore.DeleteAsync(resource.Id); resources.RemoveAll(item => item.Id == resource.Id); if (resourceBeingEdited?.Id == resource.Id) { ResetForm(); isFormVisible = false; } }
+    private void AddLocation() => AddPendingAddress();
+    private void RemoveLocation(ResourceLocation location) => draftLocations.Remove(location);
+    private bool AddPendingAddress() { var value = address.Trim(); if (string.IsNullOrWhiteSpace(value)) return false; if (!draftLocations.Any(item => string.Equals(item.FullAddress, value, StringComparison.OrdinalIgnoreCase))) draftLocations.Add(new ResourceLocation { FullAddress = value }); address = string.Empty; return true; }
+    private void ResetForm() { resourceBeingEdited = null; showValidation = false; name = category = address = description = phone = website = string.Empty; draftLocations.Clear(); }
 }

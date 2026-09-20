@@ -1,0 +1,51 @@
+@page "/account"
+@using AgileClass.Models
+@using AgileClass.Services
+@inject IJSRuntime JS
+@inject ILocalAccountService AccountService
+@inject NavigationManager Navigation
+
+<PageTitle>Account</PageTitle>
+<section class="page account-page">
+    @if (account is null)
+    {
+        <div class="panel account-panel"><h1>Sign in required</h1><p>Sign in to view and edit your account.</p><NavLink class="btn btn-primary" href="/login?returnUrl=%2Faccount">Sign in</NavLink></div>
+    }
+    else
+    {
+        <div class="panel account-panel"><h1>Edit account</h1><p>Leave the new password blank to keep your current password.</p>
+            @if (!string.IsNullOrWhiteSpace(message)) { <div class="success">@message</div> }
+            @if (!string.IsNullOrWhiteSpace(errorMessage)) { <div class="validation">@errorMessage</div> }
+            <label>Display name<input @bind="displayName" maxlength="80" autocomplete="name" /></label>
+            <label>Email address<input type="email" @bind="email" maxlength="254" autocomplete="email" /></label>
+            <label>New password<input type="password" @bind="newPassword" autocomplete="new-password" /></label>
+            <div class="actions"><button class="btn btn-primary" @onclick="SaveAsync">Save changes</button><button class="btn" @onclick="SignOut">Sign out</button></div>
+            <hr />
+            <h2>Delete account</h2>
+            <p>This permanently removes your local account. Your saved resources will remain.</p>
+            <label>Current password<input type="password" @bind="deletePassword" autocomplete="current-password" /></label>
+            <button class="btn btn-danger" @onclick="DeleteAccountAsync">Delete my account</button>
+        </div>
+    }
+</section>
+
+@code {
+    private AgileClass.Models.Account? account;
+    private string displayName = string.Empty, email = string.Empty, newPassword = string.Empty, deletePassword = string.Empty, message = string.Empty, errorMessage = string.Empty;
+    protected override async Task OnInitializedAsync() { await AccountService.EnsureInitializedAsync(); LoadAccount(); }
+    private async Task SaveAsync()
+    {
+        var result = await AccountService.UpdateAccountAsync(email, displayName, newPassword);
+        if (!result.Succeeded) { errorMessage = result.Error; message = string.Empty; return; }
+        LoadAccount(); newPassword = string.Empty; errorMessage = string.Empty; message = "Account updated.";
+    }
+    private void SignOut() { AccountService.SignOut(); Navigation.NavigateTo("/"); }
+    private async Task DeleteAccountAsync()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete your account? This cannot be undone.")) return;
+        var result = await AccountService.DeleteAccountAsync(deletePassword);
+        if (!result.Succeeded) { errorMessage = result.Error; message = string.Empty; return; }
+        Navigation.NavigateTo("/");
+    }
+    private void LoadAccount() { account = AccountService.CurrentAccount; if (account is not null) { displayName = account.DisplayName; email = account.Email; } }
+}

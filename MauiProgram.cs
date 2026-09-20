@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace AgileClass;
 
@@ -13,10 +12,13 @@ public static class MauiProgram
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 
 		builder.Services.AddMauiBlazorWebView();
+		builder.Services.AddSingleton<AgileClass.Services.ICommunityResourceStore, AgileClass.Services.CommunityResourceStore>();
+		builder.Services.AddSingleton<AgileClass.Services.ILocalAccountService, AgileClass.Services.LocalAccountService>();
+		builder.Services.AddSingleton<AgileClass.Services.ICommunityResourceStore, AgileClass.Services.CommunityResourceStore>();
+		builder.Services.AddSingleton<AgileClass.Services.ILocalAccountService, AgileClass.Services.LocalAccountService>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

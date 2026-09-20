@@ -1,5 +1,33 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@using AgileClass.Services
+@inject ILocalAccountService AccountService
 
-<main>
-    @Body
-</main>
+<nav class="app-nav">
+    <NavLink href="/" Match="NavLinkMatch.All">Resources</NavLink>
+    @if (AccountService.IsSignedIn)
+    {
+        <span>Signed in as @AccountService.CurrentAccount?.DisplayName</span>
+        <NavLink href="/account">Account</NavLink>
+        <button class="nav-button" @onclick="SignOut">Sign out</button>
+    }
+    else
+    {
+        <NavLink href="/login">Sign in</NavLink>
+        <NavLink href="/register">Create account</NavLink>
+    }
+</nav>
+
+<main>@Body</main>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        AccountService.AuthenticationStateChanged += Refresh;
+        await AccountService.EnsureInitializedAsync();
+    }
+
+    public void Dispose() => AccountService.AuthenticationStateChanged -= Refresh;
+    private void Refresh() => InvokeAsync(StateHasChanged);
+    private void SignOut() => AccountService.SignOut();
+}

@@ -1,0 +1,39 @@
+@page "/login"
+@page "/register"
+@using AgileClass.Services
+@inject ILocalAccountService AccountService
+@inject NavigationManager Navigation
+
+<PageTitle>@(isRegistration ? "Create account" : "Sign in")</PageTitle>
+<section class="page account-page"><div class="panel account-panel">
+    <h1>@(isRegistration ? "Create an account" : "Sign in")</h1>
+    <p>@(isRegistration ? "Create a local account to submit community resources." : "Sign in to submit and manage community resources.")</p>
+    @if (!string.IsNullOrWhiteSpace(errorMessage)) { <div class="validation">@errorMessage</div> }
+    @if (isRegistration) { <label>Display name<input @bind="displayName" maxlength="80" autocomplete="name" /></label> }
+    <label>Email address<input type="email" @bind="email" maxlength="254" autocomplete="email" /></label>
+    <label>Password<input type="password" @bind="password" autocomplete="@(isRegistration ? "new-password" : "current-password")" /></label>
+    @if (isRegistration) { <label>Confirm password<input type="password" @bind="confirmPassword" autocomplete="new-password" /></label> }
+    <button class="btn btn-primary" @onclick="SubmitAsync">@(isRegistration ? "Create account" : "Sign in")</button>
+    <p class="account-switch">@if (isRegistration) { <span>Already have an account? <NavLink href="/login">Sign in</NavLink></span> } else { <span>Need an account? <NavLink href="/register">Create one</NavLink></span> }</p>
+</div></section>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+    private bool isRegistration;
+    private string displayName = string.Empty, email = string.Empty, password = string.Empty, confirmPassword = string.Empty, errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync() { await AccountService.EnsureInitializedAsync(); isRegistration = Navigation.Uri.Contains("/register", StringComparison.OrdinalIgnoreCase); }
+    private async Task SubmitAsync()
+    {
+        errorMessage = string.Empty;
+        if (isRegistration)
+        {
+            if (!string.Equals(password, confirmPassword, StringComparison.Ordinal)) { errorMessage = "Passwords do not match."; return; }
+            var result = await AccountService.RegisterAsync(email, displayName, password);
+            if (!result.Succeeded) { errorMessage = result.Error; return; }
+        }
+        else if (!await AccountService.SignInAsync(email, password)) { errorMessage = "The email address or password is incorrect."; return; }
+        Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl);
+    }
+}
