@@ -13,7 +13,7 @@
     <label>Email address<input type="email" @bind="email" maxlength="254" autocomplete="email" /></label>
     <label>Password<input type="password" @bind="password" autocomplete="@(isRegistration ? "new-password" : "current-password")" /></label>
     @if (isRegistration) { <label>Confirm password<input type="password" @bind="confirmPassword" autocomplete="new-password" /></label> }
-    <button class="btn btn-primary" @onclick="SubmitAsync">@(isRegistration ? "Create account" : "Sign in")</button>
+    <button type="button" class="btn btn-primary" @onclick="SubmitAsync" disabled="@isSubmitting">@(isSubmitting ? "Working..." : isRegistration ? "Create account" : "Sign in")</button>
     <p class="account-switch">@if (isRegistration) { <span>Already have an account? <NavLink href="/login">Sign in</NavLink></span> } else { <span>Need an account? <NavLink href="/register">Create one</NavLink></span> }</p>
 </div></section>
 
@@ -21,19 +21,34 @@
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
     private bool isRegistration;
+    private bool isSubmitting;
     private string displayName = string.Empty, email = string.Empty, password = string.Empty, confirmPassword = string.Empty, errorMessage = string.Empty;
 
-    protected override async Task OnInitializedAsync() { await AccountService.EnsureInitializedAsync(); isRegistration = Navigation.Uri.Contains("/register", StringComparison.OrdinalIgnoreCase); }
+    protected override async Task OnParametersSetAsync()
+    {
+        await AccountService.EnsureInitializedAsync();
+        isRegistration = Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("register", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task SubmitAsync()
     {
+        if (isSubmitting) return;
+        isSubmitting = true;
         errorMessage = string.Empty;
-        if (isRegistration)
+        try
         {
-            if (!string.Equals(password, confirmPassword, StringComparison.Ordinal)) { errorMessage = "Passwords do not match."; return; }
-            var result = await AccountService.RegisterAsync(email, displayName, password);
-            if (!result.Succeeded) { errorMessage = result.Error; return; }
+            if (isRegistration)
+            {
+                if (!string.Equals(password, confirmPassword, StringComparison.Ordinal)) { errorMessage = "Passwords do not match."; return; }
+                var result = await AccountService.RegisterAsync(email, displayName, password);
+                if (!result.Succeeded) { errorMessage = result.Error; return; }
+            }
+            else if (!await AccountService.SignInAsync(email, password)) { errorMessage = "The email address or password is incorrect."; return; }
+            Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl);
         }
-        else if (!await AccountService.SignInAsync(email, password)) { errorMessage = "The email address or password is incorrect."; return; }
-        Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl);
+        finally
+        {
+            isSubmitting = false;
+        }
     }
 }

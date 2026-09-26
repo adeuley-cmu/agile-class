@@ -8,12 +8,25 @@
 
 <PageTitle>Resources</PageTitle>
 
-<section class="page">
-    <header class="header-row">
-        <div><h1>Community resources</h1><p>Find services and support in your community.</p></div>
+<section class="page home-page">
+    <header class="hero">
+        <div class="hero-copy">
+            <span class="eyebrow">COMMUNITY RESOURCE FINDER</span>
+            <h1>Support is closer than you think.</h1>
+            <p>Find helpful services, local programs, and trusted community support in one welcoming place.</p>
+        </div>
+        <div class="hero-summary">
+            <span class="summary-value">@resources.Count</span>
+            <span class="summary-label">resources available</span>
+            <span class="summary-dot"></span>
+        </div>
+    </header>
+    <div class="section-heading">
+        <div><h2>Explore resources</h2><p>Browse support organized for your community.</p></div>
         @if (AccountService.IsSignedIn) { <button class="btn btn-primary" @onclick="ShowAddPanel">Add resource</button> }
         else { <NavLink class="btn btn-primary" href="/login?returnUrl=%2F">Sign in to add a resource</NavLink> }
-    </header>
+    </div>
+    <div class="content-divider"></div>
     @if (showValidation) { <div class="validation">Name, category, and at least one address are required.</div> }
     @if (isFormVisible)
     {

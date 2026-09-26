@@ -2,20 +2,29 @@
 @implements IDisposable
 @using AgileClass.Services
 @inject ILocalAccountService AccountService
+@inject NavigationManager Navigation
 
 <nav class="app-nav">
-    <NavLink href="/" Match="NavLinkMatch.All">Resources</NavLink>
-    @if (AccountService.IsSignedIn)
-    {
-        <span>Signed in as @AccountService.CurrentAccount?.DisplayName</span>
-        <NavLink href="/account">Account</NavLink>
-        <button class="nav-button" @onclick="SignOut">Sign out</button>
-    }
-    else
-    {
-        <NavLink href="/login">Sign in</NavLink>
-        <NavLink href="/register">Create account</NavLink>
-    }
+    <div class="nav-inner">
+        <NavLink class="brand" href="/" Match="NavLinkMatch.All">
+            <span class="brand-mark">AC</span>
+            <span>Community Finder</span>
+        </NavLink>
+        <div class="nav-links">
+            <NavLink href="/" Match="NavLinkMatch.All">Resources</NavLink>
+            @if (AccountService.IsSignedIn)
+            {
+                <NavLink href="/account">Account</NavLink>
+                <span class="signed-in">Hi, @AccountService.CurrentAccount?.DisplayName</span>
+                <button class="nav-button" @onclick="SignOut">Sign out</button>
+            }
+            else
+            {
+                <NavLink href="/login">Sign in</NavLink>
+                <NavLink class="nav-cta" href="/register">Create account</NavLink>
+            }
+        </div>
+    </div>
 </nav>
 
 <main>@Body</main>
@@ -29,5 +38,9 @@
 
     public void Dispose() => AccountService.AuthenticationStateChanged -= Refresh;
     private void Refresh() => InvokeAsync(StateHasChanged);
-    private void SignOut() => AccountService.SignOut();
+    private void SignOut()
+    {
+        AccountService.SignOut();
+        Navigation.NavigateTo("/");
+    }
 }
