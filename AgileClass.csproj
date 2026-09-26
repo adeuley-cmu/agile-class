@@ -49,6 +49,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Remove="AgileClass.Tests\**" />
+        <EmbeddedResource Remove="AgileClass.Tests\**" />
+        <MauiXaml Remove="AgileClass.Tests\**" />
+        <None Remove="AgileClass.Tests\**" />
+    </ItemGroup>
+
+    <ItemGroup>
         <!-- App Icon -->
         <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
 
