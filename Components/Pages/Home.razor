@@ -16,8 +16,16 @@
             <p>Find helpful services, local programs, and trusted community support in one welcoming place.</p>
         </div>
         <div class="hero-summary">
-            <span class="summary-value">@resources.Count</span>
-            <span class="summary-label">resources available</span>
+            @if (loadingState.IsLoading)
+            {
+                <span class="summary-value">—</span>
+                <span class="summary-label">loading resources</span>
+            }
+            else
+            {
+                <span class="summary-value">@resources.Count</span>
+                <span class="summary-label">resources available</span>
+            }
             <span class="summary-dot"></span>
         </div>
     </header>
@@ -40,7 +48,8 @@
             <label>Website<input @bind="website" maxlength="250" /></label>
         </div><div class="actions"><button class="btn" @onclick="Cancel">Cancel</button><button class="btn btn-primary" @onclick="Save">@saveButtonText</button></div></section>
     }
-    @if (resources.Count == 0) { <section class="empty"><h2>No resources yet</h2><p>Add the first community resource to get started.</p></section> }
+    @if (loadingState.IsLoading) { <section class="empty loading-state"><h2>Loading resources</h2><p>Getting the latest community support list ready.</p></section> }
+    else if (resources.Count == 0) { <section class="empty"><h2>No resources yet</h2><p>Add the first community resource to get started.</p></section> }
     else
     {
         <section class="cards">@foreach (var resource in resources)
@@ -57,6 +66,7 @@
     private readonly List<ResourceLocation> draftLocations = [];
     private CommunityResource? resourceBeingEdited;
     private bool isFormVisible, showValidation;
+    private readonly ResourceLoadingState loadingState = new();
     private string name = string.Empty, category = string.Empty, address = string.Empty, description = string.Empty, phone = string.Empty, website = string.Empty;
     private string formTitle => resourceBeingEdited is null ? "Add a resource" : "Update resource";
     private string saveButtonText => resourceBeingEdited is null ? "Save resource" : "Update resource";
@@ -64,8 +74,15 @@
     protected override async Task OnInitializedAsync()
     {
         AccountService.AuthenticationStateChanged += Refresh;
-        await AccountService.EnsureInitializedAsync();
-        resources.AddRange(await ResourceStore.GetAllAsync());
+        try
+        {
+            await AccountService.EnsureInitializedAsync();
+            resources.AddRange(await ResourceStore.GetAllAsync());
+        }
+        finally
+        {
+            loadingState.Complete();
+        }
     }
     public void Dispose() => AccountService.AuthenticationStateChanged -= Refresh;
     private void Refresh() => InvokeAsync(StateHasChanged);

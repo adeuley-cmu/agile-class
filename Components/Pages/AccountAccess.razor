@@ -4,51 +4,50 @@
 @inject ILocalAccountService AccountService
 @inject NavigationManager Navigation
 
-<PageTitle>@(isRegistration ? "Create account" : "Sign in")</PageTitle>
+<PageTitle>@(state.IsRegistration ? "Create account" : "Sign in")</PageTitle>
 <section class="page account-page"><div class="panel account-panel">
-    <h1>@(isRegistration ? "Create an account" : "Sign in")</h1>
-    <p>@(isRegistration ? "Create a local account to submit community resources." : "Sign in to submit and manage community resources.")</p>
-    @if (!string.IsNullOrWhiteSpace(errorMessage)) { <div class="validation">@errorMessage</div> }
-    @if (isRegistration) { <label>Display name<input @bind="displayName" maxlength="80" autocomplete="name" /></label> }
-    <label>Email address<input type="email" @bind="email" maxlength="254" autocomplete="email" /></label>
-    <label>Password<input type="password" @bind="password" autocomplete="@(isRegistration ? "new-password" : "current-password")" /></label>
-    @if (isRegistration) { <label>Confirm password<input type="password" @bind="confirmPassword" autocomplete="new-password" /></label> }
-    <button type="button" class="btn btn-primary" @onclick="SubmitAsync" disabled="@isSubmitting">@(isSubmitting ? "Working..." : isRegistration ? "Create account" : "Sign in")</button>
-    <p class="account-switch">@if (isRegistration) { <span>Already have an account? <NavLink href="/login">Sign in</NavLink></span> } else { <span>Need an account? <NavLink href="/register">Create one</NavLink></span> }</p>
+    <h1>@(state.IsRegistration ? "Create an account" : "Sign in")</h1>
+    <p>@(state.IsRegistration ? "Create a local account to submit community resources." : "Sign in to submit and manage community resources.")</p>
+    @if (!string.IsNullOrWhiteSpace(state.ErrorMessage)) { <div class="validation">@state.ErrorMessage</div> }
+    @if (state.IsRegistration) { <label>Display name<input @bind="state.DisplayName" maxlength="80" autocomplete="name" /></label> }
+    <label>Email address<input type="email" @bind="state.Email" maxlength="254" autocomplete="email" /></label>
+    <label>Password<input type="password" @bind="state.Password" autocomplete="@(state.IsRegistration ? "new-password" : "current-password")" /></label>
+    @if (state.IsRegistration) { <label>Confirm password<input type="password" @bind="state.ConfirmPassword" autocomplete="new-password" /></label> }
+    <button type="button" class="btn btn-primary" @onclick="SubmitAsync" disabled="@state.IsSubmitting">@(state.IsSubmitting ? "Working..." : state.IsRegistration ? "Create account" : "Sign in")</button>
+    <p class="account-switch">@if (state.IsRegistration) { <span>Already have an account? <NavLink href="/login">Sign in</NavLink></span> } else { <span>Need an account? <NavLink href="/register">Create one</NavLink></span> }</p>
 </div></section>
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
-    private bool isRegistration;
-    private bool isSubmitting;
-    private string displayName = string.Empty, email = string.Empty, password = string.Empty, confirmPassword = string.Empty, errorMessage = string.Empty;
+    private readonly AccountAccessState state = new();
 
     protected override async Task OnParametersSetAsync()
     {
         await AccountService.EnsureInitializedAsync();
-        isRegistration = Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("register", StringComparison.OrdinalIgnoreCase);
+        var nextIsRegistration = Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("register", StringComparison.OrdinalIgnoreCase);
+        state.SetRouteMode(nextIsRegistration);
     }
 
     private async Task SubmitAsync()
     {
-        if (isSubmitting) return;
-        isSubmitting = true;
-        errorMessage = string.Empty;
+        if (state.IsSubmitting) return;
+        state.IsSubmitting = true;
+        state.ErrorMessage = string.Empty;
         try
         {
-            if (isRegistration)
+            if (state.IsRegistration)
             {
-                if (!string.Equals(password, confirmPassword, StringComparison.Ordinal)) { errorMessage = "Passwords do not match."; return; }
-                var result = await AccountService.RegisterAsync(email, displayName, password);
-                if (!result.Succeeded) { errorMessage = result.Error; return; }
+                if (!string.Equals(state.Password, state.ConfirmPassword, StringComparison.Ordinal)) { state.ErrorMessage = "Passwords do not match."; return; }
+                var result = await AccountService.RegisterAsync(state.Email, state.DisplayName, state.Password);
+                if (!result.Succeeded) { state.ErrorMessage = result.Error; return; }
             }
-            else if (!await AccountService.SignInAsync(email, password)) { errorMessage = "The email address or password is incorrect."; return; }
+            else if (!await AccountService.SignInAsync(state.Email, state.Password)) { state.ErrorMessage = "The email address or password is incorrect."; return; }
             Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl);
         }
         finally
         {
-            isSubmitting = false;
+            state.IsSubmitting = false;
         }
     }
 }
