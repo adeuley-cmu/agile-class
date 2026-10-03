@@ -15,8 +15,10 @@ public static class MauiProgram
 			});
 
 		builder.Services.AddMauiBlazorWebView();
+		builder.Services.AddSingleton<AgileClass.Services.LocalDatabase>();
 		builder.Services.AddSingleton<AgileClass.Services.ICommunityResourceStore, AgileClass.Services.CommunityResourceStore>();
 		builder.Services.AddSingleton<AgileClass.Services.ILocalAccountService, AgileClass.Services.LocalAccountService>();
+		builder.Services.AddSingleton<AgileClass.Services.IMapNavigationService, AgileClass.Services.MapNavigationService>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

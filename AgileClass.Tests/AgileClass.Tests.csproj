@@ -20,6 +20,8 @@
     <Compile Include="..\Models\ResourceLocation.cs" Link="Models\ResourceLocation.cs" />
     <Compile Include="..\Services\AccountAccessState.cs" Link="Services\AccountAccessState.cs" />
     <Compile Include="..\Services\ResourceLoadingState.cs" Link="Services\ResourceLoadingState.cs" />
+    <Compile Include="..\Services\ResourceSearch.cs" Link="Services\ResourceSearch.cs" />
+    <Compile Include="..\Services\MapUrlBuilder.cs" Link="Services\MapUrlBuilder.cs" />
   </ItemGroup>
 
 </Project>

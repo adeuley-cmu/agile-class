@@ -5,9 +5,10 @@
 @inject IJSRuntime JS
 @inject ICommunityResourceStore ResourceStore
 @inject ILocalAccountService AccountService
+@inject IMapNavigationService MapNavigation
+@inject NavigationManager Navigation
 
 <PageTitle>Resources</PageTitle>
-
 <section class="page home-page">
     <header class="hero">
         <div class="hero-copy">
@@ -23,39 +24,91 @@
             }
             else
             {
-                <span class="summary-value">@resources.Count</span>
-                <span class="summary-label">resources available</span>
+                <span class="summary-value">@filteredResults.Count</span>
+                <span class="summary-label">matching resources</span>
             }
             <span class="summary-dot"></span>
         </div>
     </header>
+
     <div class="section-heading">
-        <div><h2>Explore resources</h2><p>Browse support organized for your community.</p></div>
-        @if (AccountService.IsSignedIn) { <button class="btn btn-primary" @onclick="ShowAddPanel">Add resource</button> }
-        else { <NavLink class="btn btn-primary" href="/login?returnUrl=%2F">Sign in to add a resource</NavLink> }
+        <div><h2>Explore resources</h2><p>Search by location and the support your household needs.</p></div>
+        <div class="actions">
+            <button class="btn" @onclick="ToggleMap">@(showMap ? "Hide map" : "Map view")</button>
+            @if (AccountService.IsSignedIn) { <button class="btn btn-primary" @onclick="ShowAddPanel">Add resource</button> }
+            else { <NavLink class="btn btn-primary" href="/login?returnUrl=%2F">Sign in to add a resource</NavLink> }
+        </div>
     </div>
-    <div class="content-divider"></div>
-    @if (showValidation) { <div class="validation">Name, category, and at least one address are required.</div> }
+
+    <section class="panel filters-panel">
+        <div class="filters-grid">
+            <label>City<input @bind="cityFilter" @bind:event="oninput" maxlength="80" placeholder="Any city" /></label>
+            <label>ZIP code<input @bind="postalCodeFilter" @bind:event="oninput" inputmode="numeric" maxlength="10" placeholder="Search within a ZIP" /></label>
+            <label>Radius<select @bind="radiusSelection"><option value="">Any distance</option><option value="5">5 miles</option><option value="10">10 miles</option><option value="15">15 miles</option><option value="20">20 miles</option></select></label>
+            <label>Household size<input type="number" @bind="householdSizeFilter" min="1" max="50" placeholder="Any size" /></label>
+        </div>
+        <div class="filter-checks">
+            <label><input type="checkbox" @bind="familiesFilter" /> Families</label>
+            <label><input type="checkbox" @bind="studentsFilter" /> Students</label>
+            <label><input type="checkbox" @bind="seniorsFilter" /> Seniors</label>
+            <label><input type="checkbox" @bind="under25Filter" /> Under age 25</label>
+        </div>
+        <div class="actions filter-actions">
+            <button class="btn btn-primary" @onclick="ApplyFiltersAsync">Search resources</button>
+            <button class="btn" @onclick="ClearFilters">Clear filters</button>
+            @if (!string.IsNullOrWhiteSpace(filterSummary)) { <span class="filter-summary">@filterSummary</span> }
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage)) { <div class="validation">@errorMessage</div> }
+
+    @if (showMap)
+    {
+        <section class="panel map-panel">
+            <div class="header-row"><div><h2>Resource map</h2><p>Resources with known coordinates are shown below.</p></div><span class="map-count">@mapMarkers.Count marker(s)</span></div>
+            <div id="resource-map" class="resource-map" aria-label="Resource map"></div>
+            @if (mapMarkers.Count == 0) { <p class="map-fallback">No matching resources have map coordinates yet. The list below is still available.</p> }
+        </section>
+    }
+
     @if (isFormVisible)
     {
-        <section class="panel"><h2>@formTitle</h2><div class="form-grid">
-            <label>Resource name *<input @bind="name" maxlength="120" /></label>
-            <label>Category *<select @bind="category"><option value="">Select a category</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
-            <label>Address<div class="inline-row"><input @bind="address" maxlength="200" placeholder="Enter a full address" /><button class="btn" @onclick="AddLocation">Add</button></div></label>
-            @if (draftLocations.Count > 0) { <ul class="address-list">@foreach (var location in draftLocations) { <li><span>@location.FullAddress</span><button class="btn btn-danger" @onclick="() => RemoveLocation(location)">Remove</button></li>}</ul> }
-            <label>Description<textarea @bind="description" maxlength="500"></textarea></label>
-            <label>Phone number<input @bind="phone" maxlength="30" /></label>
-            <label>Website<input @bind="website" maxlength="250" /></label>
-        </div><div class="actions"><button class="btn" @onclick="Cancel">Cancel</button><button class="btn btn-primary" @onclick="Save">@saveButtonText</button></div></section>
+        <section class="panel"><h2>@formTitle</h2>
+            <div class="form-grid">
+                <label>Resource name *<input @bind="name" maxlength="120" /></label>
+                <label>Category *<select @bind="category"><option value="">Select a category</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
+                <fieldset><legend>Who does this resource serve?</legend><div class="filter-checks"><label><input type="checkbox" @bind="servesFamilies" /> Families</label><label><input type="checkbox" @bind="servesStudents" /> Students</label><label><input type="checkbox" @bind="servesSeniors" /> Seniors</label><label><input type="checkbox" @bind="servesUnder25" /> Under age 25</label></div></fieldset>
+                <div class="inline-fields"><label>Minimum household size<input type="number" @bind="minimumHouseholdSize" min="1" max="50" /></label><label>Maximum household size<input type="number" @bind="maximumHouseholdSize" min="1" max="50" /></label></div>
+                <label>Street address *<input @bind="address" maxlength="200" placeholder="Enter a full street address" /></label>
+                <div class="inline-fields"><label>City<input @bind="city" maxlength="80" /></label><label>State<input @bind="state" maxlength="40" /></label><label>ZIP code<input @bind="postalCode" maxlength="10" inputmode="numeric" /></label></div>
+                <button type="button" class="btn add-location" @onclick="AddLocation">Add location</button>
+                @if (draftLocations.Count > 0) { <ul class="address-list">@foreach (var location in draftLocations) { <li><span>@location.DisplayAddress</span><button class="btn btn-danger" @onclick="() => RemoveLocation(location)">Remove</button></li>}</ul> }
+                <label>Description<textarea @bind="description" maxlength="500"></textarea></label>
+                <label>Phone number<input @bind="phone" maxlength="30" /></label>
+                <label>Website<input @bind="website" maxlength="250" /></label>
+            </div>
+            <div class="actions"><button class="btn" @onclick="Cancel">Cancel</button><button class="btn btn-primary" @onclick="SaveAsync">@saveButtonText</button></div>
+        </section>
     }
+
     @if (loadingState.IsLoading) { <section class="empty loading-state"><h2>Loading resources</h2><p>Getting the latest community support list ready.</p></section> }
-    else if (resources.Count == 0) { <section class="empty"><h2>No resources yet</h2><p>Add the first community resource to get started.</p></section> }
+    else if (filteredResults.Count == 0) { <section class="empty"><h2>No matching resources</h2><p>Try clearing a filter or add the first community resource.</p></section> }
     else
     {
-        <section class="cards">@foreach (var resource in resources)
+        <section class="cards">@foreach (var result in filteredResults)
         {
-            <article class="card"><div class="card-header"><h3>@resource.Name</h3>@if (AccountService.IsSignedIn) { <div class="actions"><button class="btn" @onclick="() => EditResource(resource)">Edit</button><button class="btn btn-danger" @onclick="() => DeleteResource(resource)">Delete</button></div> }</div>
-            <p class="category">@resource.Category</p>@foreach (var location in resource.Locations) { <p>Address: @location.FullAddress</p> }@if (!string.IsNullOrWhiteSpace(resource.Description)) { <p>@resource.Description</p> }</article>
+            var resource = result.Resource;
+            <article class="card">
+                <div class="card-header"><h3>@resource.Name</h3>@if (CanManage(resource)) { <div class="actions"><button class="btn" @onclick="() => EditResource(resource)">Edit</button><button class="btn btn-danger" @onclick="() => DeleteResourceAsync(resource)">Delete</button></div> }</div>
+                <p class="category">@resource.Category</p>
+                @if (result.DistanceMiles is double distance) { <p class="distance">@distance.ToString("0.0") miles away</p> }
+                @foreach (var location in resource.Locations)
+                {
+                    <div class="location-row"><span>📍 @location.DisplayAddress</span><button class="btn" @onclick="() => OpenDirectionsAsync(location)">Directions</button></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(resource.Description)) { <p>@resource.Description</p> }
+                <div class="resource-tags">@if (resource.ServesFamilies) { <span>Families</span> }@if (resource.ServesStudents) { <span>Students</span> }@if (resource.ServesSeniors) { <span>Seniors</span> }@if (resource.ServesUnder25) { <span>Under 25</span> }</div>
+            </article>
         }</section>
     }
 </section>
@@ -64,12 +117,22 @@
     private static readonly string[] Categories = ["Food", "Shelter", "Healthcare", "Clothing", "Employment", "Transportation", "Legal Assistance", "Other"];
     private readonly List<CommunityResource> resources = [];
     private readonly List<ResourceLocation> draftLocations = [];
-    private CommunityResource? resourceBeingEdited;
-    private bool isFormVisible, showValidation;
     private readonly ResourceLoadingState loadingState = new();
-    private string name = string.Empty, category = string.Empty, address = string.Empty, description = string.Empty, phone = string.Empty, website = string.Empty;
+    private List<ResourceSearchResult> filteredResults = [];
+    private CommunityResource? resourceBeingEdited;
+    private bool isFormVisible, showMap;
+    private string errorMessage = string.Empty, cityFilter = string.Empty, postalCodeFilter = string.Empty, radiusSelection = string.Empty;
+    private bool familiesFilter, studentsFilter, seniorsFilter, under25Filter;
+    private int? householdSizeFilter;
+    private double? centerLatitude, centerLongitude;
+    private string name = string.Empty, category = string.Empty, address = string.Empty, city = string.Empty, state = string.Empty, postalCode = string.Empty, description = string.Empty, phone = string.Empty, website = string.Empty;
+    private bool servesFamilies, servesStudents, servesSeniors, servesUnder25;
+    private int? minimumHouseholdSize, maximumHouseholdSize;
     private string formTitle => resourceBeingEdited is null ? "Add a resource" : "Update resource";
     private string saveButtonText => resourceBeingEdited is null ? "Save resource" : "Update resource";
+    private double? SelectedRadius => double.TryParse(radiusSelection, out var value) ? value : null;
+    private IReadOnlyList<MapMarker> mapMarkers => filteredResults.SelectMany(result => result.Resource.Locations.Where(location => location.Latitude is not null && location.Longitude is not null).Select(location => new MapMarker(result.Resource.Name, result.Resource.Category, location.DisplayAddress, location.Latitude!.Value, location.Longitude!.Value))).ToArray();
+    private string filterSummary => filteredResults.Count == resources.Count ? string.Empty : $"Showing {filteredResults.Count} of {resources.Count} resources";
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,32 +141,112 @@
         {
             await AccountService.EnsureInitializedAsync();
             resources.AddRange(await ResourceStore.GetAllAsync());
+            ApplyCurrentFilters();
         }
-        finally
+        finally { loadingState.Complete(); }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showMap && !loadingState.IsLoading)
         {
-            loadingState.Complete();
+            try { await JS.InvokeVoidAsync("resourceMap.render", "resource-map", mapMarkers); }
+            catch (JSException) { errorMessage = "The map is unavailable right now. You can still use the resource list."; }
         }
     }
+
     public void Dispose() => AccountService.AuthenticationStateChanged -= Refresh;
     private void Refresh() => InvokeAsync(StateHasChanged);
+    private bool CanManage(CommunityResource resource) => AccountService.CurrentAccount is { Id: var id } && resource.OwnerAccountId == id;
+    private void ToggleMap() => showMap = !showMap;
     private void ShowAddPanel() { if (!AccountService.IsSignedIn) return; ResetForm(); isFormVisible = true; }
     private void Cancel() { ResetForm(); isFormVisible = false; }
-
-    private async Task Save()
+    private async Task ApplyFiltersAsync()
     {
-        AddPendingAddress();
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || draftLocations.Count == 0) { showValidation = true; await JS.InvokeVoidAsync("alert", "Name, category, and at least one address are required."); return; }
-        var updated = new CommunityResource { Id = resourceBeingEdited?.Id ?? Guid.NewGuid(), Name = name.Trim(), Category = category, Locations = draftLocations.ToArray(), Description = description.Trim(), Phone = phone.Trim(), Website = website.Trim(), CreatedAt = resourceBeingEdited?.CreatedAt ?? DateTimeOffset.UtcNow };
-        await ResourceStore.SaveAsync(updated);
-        var index = resources.FindIndex(item => item.Id == updated.Id);
-        if (index < 0) resources.Add(updated); else resources[index] = updated;
-        ResetForm(); isFormVisible = false;
+        errorMessage = string.Empty;
+        if (SelectedRadius is not null && string.IsNullOrWhiteSpace(postalCodeFilter)) { errorMessage = "Enter a ZIP code before selecting a radius."; return; }
+        if (!string.IsNullOrWhiteSpace(postalCodeFilter))
+        {
+            try
+            {
+                var locations = await Microsoft.Maui.Devices.Sensors.Geocoding.Default.GetLocationsAsync(postalCodeFilter.Trim());
+                var location = locations?.FirstOrDefault();
+                if (location is null) { errorMessage = "That ZIP code could not be located."; return; }
+                centerLatitude = location.Latitude;
+                centerLongitude = location.Longitude;
+            }
+            catch (Exception) { errorMessage = "ZIP lookup is unavailable. You can still filter by city."; return; }
+        }
+        else { centerLatitude = centerLongitude = null; }
+        ApplyCurrentFilters();
     }
 
-    private void EditResource(CommunityResource resource) { if (!AccountService.IsSignedIn) return; resourceBeingEdited = resource; isFormVisible = true; showValidation = false; name = resource.Name; category = resource.Category; description = resource.Description; phone = resource.Phone; website = resource.Website; address = string.Empty; draftLocations.Clear(); draftLocations.AddRange(resource.Locations); }
-    private async Task DeleteResource(CommunityResource resource) { if (!AccountService.IsSignedIn || !await JS.InvokeAsync<bool>("confirm", $"Remove {resource.Name} from the resource list?")) return; await ResourceStore.DeleteAsync(resource.Id); resources.RemoveAll(item => item.Id == resource.Id); if (resourceBeingEdited?.Id == resource.Id) { ResetForm(); isFormVisible = false; } }
-    private void AddLocation() => AddPendingAddress();
+    private void ApplyCurrentFilters() => filteredResults = ResourceSearch.Apply(resources, new ResourceFilter { City = cityFilter, PostalCode = postalCodeFilter, CenterLatitude = centerLatitude, CenterLongitude = centerLongitude, RadiusMiles = SelectedRadius, Families = familiesFilter, Students = studentsFilter, Seniors = seniorsFilter, Under25 = under25Filter, HouseholdSize = householdSizeFilter }).ToList();
+    private void ClearFilters() { cityFilter = postalCodeFilter = radiusSelection = string.Empty; householdSizeFilter = null; familiesFilter = studentsFilter = seniorsFilter = under25Filter = false; centerLatitude = centerLongitude = null; errorMessage = string.Empty; ApplyCurrentFilters(); }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = string.Empty; AddPendingLocation();
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || draftLocations.Count == 0) { errorMessage = "Name, category, and at least one location are required."; return; }
+        if (minimumHouseholdSize is int minimum && maximumHouseholdSize is int maximum && minimum > maximum) { errorMessage = "Minimum household size cannot exceed the maximum."; return; }
+        try
+        {
+            var locations = new List<ResourceLocation>();
+            foreach (var location in draftLocations) locations.Add(await AddCoordinatesAsync(location));
+            var updated = new CommunityResource { Id = resourceBeingEdited?.Id ?? Guid.NewGuid(), OwnerAccountId = AccountService.CurrentAccount!.Id, Name = name.Trim(), Category = category, Locations = locations, Description = description.Trim(), Phone = phone.Trim(), Website = website.Trim(), ServesFamilies = servesFamilies, ServesStudents = servesStudents, ServesSeniors = servesSeniors, ServesUnder25 = servesUnder25, MinimumHouseholdSize = minimumHouseholdSize, MaximumHouseholdSize = maximumHouseholdSize, CreatedAt = resourceBeingEdited?.CreatedAt ?? DateTimeOffset.UtcNow };
+            await ResourceStore.SaveAsync(updated, AccountService.CurrentAccount.Id);
+            var index = resources.FindIndex(item => item.Id == updated.Id);
+            if (index < 0) resources.Add(updated); else resources[index] = updated;
+            ResetForm(); isFormVisible = false; ApplyCurrentFilters();
+        }
+        catch (UnauthorizedAccessException exception) { errorMessage = exception.Message; }
+        catch (Exception) { errorMessage = "The resource could not be saved. Please try again."; }
+    }
+
+    private async Task<ResourceLocation> AddCoordinatesAsync(ResourceLocation location)
+    {
+        if (location.Latitude is not null && location.Longitude is not null) return location;
+        try
+        {
+            var coordinates = await Microsoft.Maui.Devices.Sensors.Geocoding.Default.GetLocationsAsync(location.DisplayAddress);
+            var coordinate = coordinates?.FirstOrDefault();
+            return coordinate is null ? location : new ResourceLocation { Id = location.Id, FullAddress = location.FullAddress, City = location.City, State = location.State, PostalCode = location.PostalCode, Latitude = coordinate.Latitude, Longitude = coordinate.Longitude };
+        }
+        catch (Exception) { return location; }
+    }
+
+    private void EditResource(CommunityResource resource)
+    {
+        if (!CanManage(resource)) return;
+        resourceBeingEdited = resource; isFormVisible = true; errorMessage = string.Empty;
+        name = resource.Name; category = resource.Category; description = resource.Description; phone = resource.Phone; website = resource.Website; servesFamilies = resource.ServesFamilies; servesStudents = resource.ServesStudents; servesSeniors = resource.ServesSeniors; servesUnder25 = resource.ServesUnder25; minimumHouseholdSize = resource.MinimumHouseholdSize; maximumHouseholdSize = resource.MaximumHouseholdSize; address = city = state = postalCode = string.Empty; draftLocations.Clear(); draftLocations.AddRange(resource.Locations);
+    }
+
+    private async Task DeleteResourceAsync(CommunityResource resource)
+    {
+        if (!CanManage(resource) || !await JS.InvokeAsync<bool>("confirm", $"Remove {resource.Name} from the resource list?")) return;
+        try { await ResourceStore.DeleteAsync(resource.Id, AccountService.CurrentAccount!.Id); resources.RemoveAll(item => item.Id == resource.Id); if (resourceBeingEdited?.Id == resource.Id) Cancel(); ApplyCurrentFilters(); }
+        catch (UnauthorizedAccessException exception) { errorMessage = exception.Message; }
+    }
+
+    private async Task OpenDirectionsAsync(ResourceLocation location)
+    {
+        try { await MapNavigation.OpenDirectionsAsync(location); }
+        catch (Exception) { errorMessage = "Directions could not be opened on this device."; }
+    }
+
+    private void AddLocation()
+    {
+        var value = address.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!draftLocations.Any(item => string.Equals(item.DisplayAddress, new ResourceLocation { FullAddress = value, City = city, State = state, PostalCode = postalCode }.DisplayAddress, StringComparison.OrdinalIgnoreCase)))
+            draftLocations.Add(new ResourceLocation { FullAddress = value, City = city.Trim(), State = state.Trim(), PostalCode = postalCode.Trim() });
+        address = city = state = postalCode = string.Empty;
+    }
+
     private void RemoveLocation(ResourceLocation location) => draftLocations.Remove(location);
-    private bool AddPendingAddress() { var value = address.Trim(); if (string.IsNullOrWhiteSpace(value)) return false; if (!draftLocations.Any(item => string.Equals(item.FullAddress, value, StringComparison.OrdinalIgnoreCase))) draftLocations.Add(new ResourceLocation { FullAddress = value }); address = string.Empty; return true; }
-    private void ResetForm() { resourceBeingEdited = null; showValidation = false; name = category = address = description = phone = website = string.Empty; draftLocations.Clear(); }
+    private void AddPendingLocation() { if (!string.IsNullOrWhiteSpace(address)) AddLocation(); }
+    private void ResetForm() { resourceBeingEdited = null; name = category = address = city = state = postalCode = description = phone = website = string.Empty; servesFamilies = servesStudents = servesSeniors = servesUnder25 = false; minimumHouseholdSize = maximumHouseholdSize = null; draftLocations.Clear(); }
+
+    public sealed record MapMarker(string Name, string Category, string Address, double Latitude, double Longitude);
 }

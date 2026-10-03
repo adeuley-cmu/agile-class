@@ -26,9 +26,9 @@ public sealed class LocalAccountService : ILocalAccountService
     private readonly Task initialization;
     private Account? currentAccount;
 
-    public LocalAccountService()
+    public LocalAccountService(LocalDatabase localDatabase)
     {
-        database = new SQLiteAsyncConnection(Path.Combine(FileSystem.AppDataDirectory, "agileclass.db3"));
+        database = localDatabase.Connection;
         initialization = InitializeAsync();
     }
 
