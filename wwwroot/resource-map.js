@@ -16,7 +16,7 @@ window.resourceMap = (() => {
         if (!element || typeof L === "undefined") return;
 
         if (!map || map.getContainer() !== element) {
-            map = L.map(element).setView([39.8283, -98.5795], 4);
+            map = L.map(element, { zoomControl: true }).setView([39.8283, -98.5795], 4);
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 maxZoom: 19,
                 attribution: "&copy; OpenStreetMap contributors"

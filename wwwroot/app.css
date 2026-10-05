@@ -26,6 +26,17 @@ body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(-
 .summary-dot { display: block; width: 9px; height: 9px; margin-top: 20px; border-radius: 50%; background: var(--accent); }
 .section-heading, .header-row, .card-header, .actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .section-heading { margin-top: 42px; }
+.page-heading { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
+.page-heading h1 { margin: 12px 0 6px; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.04em; }
+.page-heading p { margin: 0; color: var(--muted); }
+.back-link { color: var(--brand); font-weight: 700; text-decoration: none; }
+.resource-editor-panel { max-width: 760px; margin: 0 auto; }
+.resource-editor-panel .form-grid { gap: 18px; }
+.location-entry { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f8fbfa; }
+.location-entry .inline-fields { margin-top: -2px; }
+.field-label { display: block; margin-bottom: 8px; color: #38515c; font-size: .88rem; font-weight: 600; }
+.address-list-wrapper { padding: 0 2px; }
+.editor-actions { justify-content: flex-end; margin-top: 22px; }
 .section-heading h2 { margin: 0; font-size: 1.5rem; letter-spacing: -.02em; }
 .section-heading p { margin: 5px 0 0; color: var(--muted); }
 .content-divider { height: 1px; margin: 20px 0 24px; background: var(--line); }
@@ -41,6 +52,7 @@ body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(-
 .filter-summary, .map-count { color: var(--muted); font-size: .88rem; }
 .map-panel { padding-bottom: 18px; }
 .resource-map { min-height: 360px; border-radius: 12px; overflow: hidden; background: #e5efed; }
+.resource-map .leaflet-container { font: inherit; }
 .map-fallback { margin: 12px 0 0; color: var(--muted); }
 .inline-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .inline-fields label:nth-child(1):only-child { grid-column: 1 / -1; }
@@ -96,6 +108,8 @@ textarea { min-height: 100px; resize: vertical; }
     .hero-summary { width: 100%; min-width: 0; }
     .section-heading, .header-row { align-items: flex-start; flex-direction: column; }
     .section-heading .btn, .header-row .btn { width: 100%; text-align: center; }
+    .page-heading { margin-bottom: 18px; }
+    .resource-editor-panel { padding: 18px; }
     .account-panel { padding: 24px 20px; }
     .actions { flex-wrap: wrap; }
     .actions .btn { flex: 1; }
@@ -103,6 +117,8 @@ textarea { min-height: 100px; resize: vertical; }
     .resource-map { min-height: 300px; }
     .location-row { align-items: flex-start; flex-direction: column; }
     .location-row .btn { width: 100%; }
+    .editor-actions { flex-direction: column-reverse; align-items: stretch; }
+    .editor-actions .btn { width: 100%; }
 }
 
 .valid.modified:not([type=checkbox]) {

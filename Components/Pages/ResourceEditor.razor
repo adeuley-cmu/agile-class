@@ -1,0 +1,147 @@
+@page "/resources/new"
+@page "/resources/edit/{ResourceId:guid}"
+@using AgileClass.Models
+@using AgileClass.Services
+@using Microsoft.Extensions.Logging
+@inject ICommunityResourceStore ResourceStore
+@inject ILocalAccountService AccountService
+@inject NavigationManager Navigation
+@inject ILogger<ResourceEditor> Logger
+
+<PageTitle>@(IsEditMode ? "Edit resource" : "Add resource")</PageTitle>
+<section class="page resource-editor-page">
+    <div class="page-heading">
+        <div>
+            <NavLink class="back-link" href="/">← Back to resources</NavLink>
+            <h1>@(IsEditMode ? "Edit resource" : "Add a resource")</h1>
+            <p>@(IsEditMode ? "Keep this resource's information current." : "Add a community resource for people who need support.")</p>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <section class="empty"><h2>Loading resource</h2><p>Getting the form ready.</p></section>
+    }
+    else if (resourceNotFound)
+    {
+        <section class="empty"><h2>Resource not found</h2><p>It may have been removed or is no longer available.</p><NavLink class="btn btn-primary" href="/">Return to resources</NavLink></section>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(errorMessage)) { <div class="validation">@errorMessage</div> }
+        <section class="panel resource-editor-panel">
+            <div class="form-grid">
+                <label>Resource name *<input @bind="name" maxlength="120" /></label>
+                <label>Category *<select @bind="category"><option value="">Select a category</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
+                <fieldset><legend>Who does this resource serve?</legend><div class="filter-checks"><label><input type="checkbox" @bind="servesFamilies" /> Families</label><label><input type="checkbox" @bind="servesStudents" /> Students</label><label><input type="checkbox" @bind="servesSeniors" /> Seniors</label><label><input type="checkbox" @bind="servesUnder25" /> Under age 25</label></div></fieldset>
+                <div class="inline-fields"><label>Minimum household size<input type="number" @bind="minimumHouseholdSize" min="1" max="50" /></label><label>Maximum household size<input type="number" @bind="maximumHouseholdSize" min="1" max="50" /></label></div>
+                <div class="location-entry">
+                    <label>Street address *<input @bind="address" maxlength="200" placeholder="Enter a full street address" /></label>
+                    <div class="inline-fields"><label>City<input @bind="city" maxlength="80" /></label><label>State<input @bind="state" maxlength="40" /></label><label>ZIP code<input @bind="postalCode" maxlength="10" inputmode="numeric" /></label></div>
+                    <button type="button" class="btn add-location" @onclick="AddLocation">Add location</button>
+                </div>
+                @if (draftLocations.Count > 0)
+                {
+                    <div class="address-list-wrapper"><span class="field-label">Locations</span><ul class="address-list">@foreach (var location in draftLocations) { <li><span>@location.DisplayAddress</span><button type="button" class="btn btn-danger" @onclick="() => RemoveLocation(location)">Remove</button></li>}</ul></div>
+                }
+                <label>Description<textarea @bind="description" maxlength="500"></textarea></label>
+                <label>Phone number<input @bind="phone" maxlength="30" /></label>
+                <label>Website<input @bind="website" maxlength="250" /></label>
+            </div>
+            <div class="actions editor-actions"><button type="button" class="btn" @onclick="Cancel">Cancel</button><button type="button" class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : (IsEditMode ? "Save changes" : "Save resource"))</button></div>
+        </section>
+    }
+</section>
+
+@code {
+    private static readonly string[] Categories = ["Food", "Shelter", "Healthcare", "Clothing", "Employment", "Transportation", "Legal Assistance", "Other"];
+    private readonly List<ResourceLocation> draftLocations = [];
+    private CommunityResource? resourceBeingEdited;
+    private bool loading = true, saving, resourceNotFound;
+    private string errorMessage = string.Empty;
+    private string name = string.Empty, category = string.Empty, address = string.Empty, city = string.Empty, state = string.Empty, postalCode = string.Empty, description = string.Empty, phone = string.Empty, website = string.Empty;
+    private bool servesFamilies, servesStudents, servesSeniors, servesUnder25;
+    private int? minimumHouseholdSize, maximumHouseholdSize;
+
+    [Parameter] public Guid? ResourceId { get; set; }
+    private bool IsEditMode => ResourceId is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AccountService.EnsureInitializedAsync();
+        if (!AccountService.IsSignedIn)
+        {
+            var returnUrl = IsEditMode ? $"/resources/edit/{ResourceId}" : "/resources/new";
+            Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
+
+        if (ResourceId is Guid id)
+        {
+            resourceBeingEdited = (await ResourceStore.GetAllAsync()).FirstOrDefault(resource => resource.Id == id);
+            if (resourceBeingEdited is null) resourceNotFound = true;
+            else LoadResource(resourceBeingEdited);
+        }
+
+        loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = string.Empty;
+        AddPendingLocation();
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || draftLocations.Count == 0) { errorMessage = "Name, category, and at least one location are required."; return; }
+        if (minimumHouseholdSize is int minimum && maximumHouseholdSize is int maximum && minimum > maximum) { errorMessage = "Minimum household size cannot exceed the maximum."; return; }
+
+        saving = true;
+        try
+        {
+            var locations = new List<ResourceLocation>();
+            foreach (var location in draftLocations) locations.Add(await AddCoordinatesAsync(location));
+            var updated = new CommunityResource { Id = resourceBeingEdited?.Id ?? Guid.NewGuid(), OwnerAccountId = AccountService.CurrentAccount!.Id, Name = name.Trim(), Category = category, Locations = locations, Description = description.Trim(), Phone = phone.Trim(), Website = website.Trim(), ServesFamilies = servesFamilies, ServesStudents = servesStudents, ServesSeniors = servesSeniors, ServesUnder25 = servesUnder25, MinimumHouseholdSize = minimumHouseholdSize, MaximumHouseholdSize = maximumHouseholdSize, CreatedAt = resourceBeingEdited?.CreatedAt ?? DateTimeOffset.UtcNow };
+            await ResourceStore.SaveAsync(updated, AccountService.CurrentAccount.Id);
+            Navigation.NavigateTo("/");
+        }
+        catch (UnauthorizedAccessException exception) { errorMessage = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to save community resource {ResourceName} for account {AccountId}", name, AccountService.CurrentAccount?.Id);
+#if DEBUG
+            errorMessage = $"The resource could not be saved: {exception.Message}";
+#else
+            errorMessage = "The resource could not be saved. Please try again.";
+#endif
+        }
+        finally { saving = false; }
+    }
+
+    private async Task<ResourceLocation> AddCoordinatesAsync(ResourceLocation location)
+    {
+        if (location.Latitude is not null && location.Longitude is not null) return location;
+        try
+        {
+            var coordinates = await Microsoft.Maui.Devices.Sensors.Geocoding.Default.GetLocationsAsync(location.DisplayAddress);
+            var coordinate = coordinates?.FirstOrDefault();
+            return coordinate is null ? location : new ResourceLocation { Id = location.Id, FullAddress = location.FullAddress, City = location.City, State = location.State, PostalCode = location.PostalCode, Latitude = coordinate.Latitude, Longitude = coordinate.Longitude };
+        }
+        catch (Exception) { return location; }
+    }
+
+    private void AddLocation()
+    {
+        var value = address.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return;
+        var candidate = new ResourceLocation { FullAddress = value, City = city, State = state, PostalCode = postalCode };
+        if (!draftLocations.Any(item => string.Equals(item.DisplayAddress, candidate.DisplayAddress, StringComparison.OrdinalIgnoreCase))) draftLocations.Add(candidate);
+        address = city = state = postalCode = string.Empty;
+    }
+
+    private void AddPendingLocation() { if (!string.IsNullOrWhiteSpace(address)) AddLocation(); }
+    private void RemoveLocation(ResourceLocation location) => draftLocations.Remove(location);
+    private void Cancel() => Navigation.NavigateTo("/");
+
+    private void LoadResource(CommunityResource resource)
+    {
+        name = resource.Name; category = resource.Category; description = resource.Description; phone = resource.Phone; website = resource.Website; servesFamilies = resource.ServesFamilies; servesStudents = resource.ServesStudents; servesSeniors = resource.ServesSeniors; servesUnder25 = resource.ServesUnder25; minimumHouseholdSize = resource.MinimumHouseholdSize; maximumHouseholdSize = resource.MaximumHouseholdSize; draftLocations.AddRange(resource.Locations);
+    }
+}

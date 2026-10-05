@@ -57,11 +57,11 @@ public sealed class CommunityResourceStore : ICommunityResourceStore
     {
         if (ownerAccountId == Guid.Empty) throw new UnauthorizedAccessException("A signed-in account is required to save a resource.");
         await initialization;
-        var existing = await database.Table<StoredResource>().Where(item => item.Id == resource.Id.ToString()).FirstOrDefaultAsync();
+        var id = resource.Id.ToString();
+        var existing = await database.Table<StoredResource>().Where(item => item.Id == id).FirstOrDefaultAsync();
         if (existing is not null && ParseGuid(existing.OwnerAccountId) != ownerAccountId)
             throw new UnauthorizedAccessException("Only the resource owner can update this resource.");
 
-        var id = resource.Id.ToString();
         var stored = new StoredResource
         {
             Id = id, OwnerAccountId = ownerAccountId.ToString(), Name = resource.Name, Category = resource.Category,
